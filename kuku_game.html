@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>九九チャレンジ</title>
+    <style>
+        /* 全体のスタイル */
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f9ff; /* 明るい青色の背景 */
+        }
+
+        /* ゲームコンテナのスタイル */
+        #game-container {
+            background-color: white;
+            padding: 20px 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 90%;
+            max-width: 380px;
+        }
+
+        h1 {
+            color: #007bff;
+            font-size: 2em;
+        }
+
+        h2 {
+            font-size: 1.2em;
+            color: #555;
+        }
+
+        /* 問題表示エリア */
+        #problem {
+            font-size: 3em;
+            margin: 20px 0;
+            font-weight: bold;
+            color: #333;
+            letter-spacing: 0.1em;
+        }
+
+        /* 回答入力欄 */
+        #answer {
+            width: 120px;
+            padding: 10px;
+            font-size: 2em;
+            text-align: center;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        /* 正解・不正解のフィードバック */
+        #feedback {
+            font-size: 1.2em;
+            font-weight: bold;
+            height: 30px; /* 高さを固定してレイアウトが崩れないようにする */
+            line-height: 30px;
+        }
+
+        .correct { color: #28a745; } /* 正解は緑 */
+        .incorrect { color: #dc3545; } /* 不正解は赤 */
+
+        /* ボタンの共通スタイル */
+        button {
+            font-size: 1.2em;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+
+        /* 「こたえる」ボタン */
+        #submit-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            margin-top: 10px;
+        }
+        #submit-btn:hover {
+            background-color: #0056b3;
+        }
+
+        /* テンキーのコンテナ */
+        #tenkey-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        /* テンキーのボタン */
+        .tenkey-btn {
+            padding: 15px;
+            font-size: 1.8em;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+        .tenkey-btn:hover {
+            background-color: #e9ecef;
+        }
+
+        /* 結果表示エリア */
+        #result-container {
+            display: none; /* 最初は非表示 */
+        }
+        #score {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #ff8c00;
+        }
+
+        /* 「もういちど」ボタン */
+        #restart-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #28a745;
+            color: white;
+            margin-top: 20px;
+        }
+        #restart-btn:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- 問題表示画面 -->
+        <div id="question-container">
+            <h1>九九チャレンジ</h1>
+            <h2 id="question-number"></h2>
+            <div id="problem"></div>
+            <input type="number" id="answer" readonly>
+            <div id="feedback"></div>
+            
+            <!-- テンキー -->
+            <div id="tenkey-container">
+                <button class="tenkey-btn">1</button>
+                <button class="tenkey-btn">2</button>
+                <button class="tenkey-btn">3</button>
+                <button class="tenkey-btn">4</button>
+                <button class="tenkey-btn">5</button>
+                <button class="tenkey-btn">6</button>
+                <button class="tenkey-btn">7</button>
+                <button class="tenkey-btn">8</button>
+                <button class="tenkey-btn">9</button>
+                <button class="tenkey-btn" data-action="clear">C</button>
+                <button class="tenkey-btn">0</button>
+                <button class="tenkey-btn" data-action="backspace">⌫</button>
+            </div>
+            <button id="submit-btn">こたえる</button>
+        </div>
+
+        <!-- 結果表示画面 -->
+        <div id="result-container">
+            <h1>けっかはっぴょう</h1>
+            <p id="score"></p>
+            <button id="restart-btn">もういちど やる</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM要素の取得 ---
+        const questionContainer = document.getElementById('question-container');
+        const resultContainer = document.getElementById('result-container');
+        const problemEl = document.getElementById('problem');
+        const answerEl = document.getElementById('answer');
+        const feedbackEl = document.getElementById('feedback');
+        const questionNumberEl = document.getElementById('question-number');
+        const scoreEl = document.getElementById('score');
+        const submitBtn = document.getElementById('submit-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const tenkeyContainer = document.getElementById('tenkey-container');
+
+        // --- ゲームの状態を管理する変数 ---
+        const TOTAL_PROBLEMS = 10;
+        let currentProblem = 1;
+        let score = 0;
+        let num1, num2; // 問題の数字
+
+        // --- 関数定義 ---
+
+        // 新しい問題を作成して表示する関数
+        function generateProblem() {
+            // 2から9までのランダムな数字を生成
+            num1 = Math.floor(Math.random() * 8) + 2;
+            num2 = Math.floor(Math.random() * 8) + 2;
+            
+            problemEl.textContent = `${num1} × ${num2}`;
+            questionNumberEl.textContent = `だい ${currentProblem} もん`;
+            
+            // 入力とフィードバックをリセット
+            answerEl.value = '';
+            feedbackEl.textContent = '';
+            feedbackEl.className = '';
+            submitBtn.disabled = false;
+        }
+
+        // 回答をチェックする関数
+        function checkAnswer() {
+            const userAnswer = parseInt(answerEl.value, 10);
+            const correctAnswer = num1 * num2;
+
+            if (isNaN(userAnswer)) {
+                feedbackEl.textContent = 'すうじをいれてね';
+                feedbackEl.className = 'incorrect';
+                return;
+            }
+
+            if (userAnswer === correctAnswer) {
+                score++;
+                feedbackEl.textContent = 'せいかい！すごい！';
+                feedbackEl.className = 'correct';
+            } else {
+                feedbackEl.textContent = `おしい！こたえは ${correctAnswer}`;
+                feedbackEl.className = 'incorrect';
+            }
+            
+            submitBtn.disabled = true; // 連続クリック防止
+
+            // 1.5秒後に次のステップへ
+            setTimeout(() => {
+                currentProblem++;
+                if (currentProblem <= TOTAL_PROBLEMS) {
+                    generateProblem();
+                } else {
+                    showResult();
+                }
+            }, 1500);
+        }
+
+        // 最終結果を表示する関数
+        function showResult() {
+            questionContainer.style.display = 'none';
+            resultContainer.style.display = 'block';
+            scoreEl.textContent = `${TOTAL_PROBLEMS}もんちゅう ${score}もん せいかい！`;
+        }
+
+        // ゲームをリセットして最初から始める関数
+        function restartGame() {
+            currentProblem = 1;
+            score = 0;
+            resultContainer.style.display = 'none';
+            questionContainer.style.display = 'block';
+            generateProblem();
+        }
+
+        // --- イベントリスナーの設定 ---
+
+        // 「こたえる」ボタンがクリックされたとき
+        submitBtn.addEventListener('click', checkAnswer);
+
+        // 「もういちど」ボタンがクリックされたとき
+        restartBtn.addEventListener('click', restartGame);
+
+        // テンキーがクリックされたとき
+        tenkeyContainer.addEventListener('click', (e) => {
+            const target = e.target;
+            if (!target.classList.contains('tenkey-btn')) return;
+
+            const action = target.dataset.action;
+            const value = target.textContent;
+
+            if (action === 'clear') {
+                answerEl.value = '';
+            } else if (action === 'backspace') {
+                answerEl.value = answerEl.value.slice(0, -1);
+            } else {
+                // 数字が長くなりすぎないように制限
+                if (answerEl.value.length < 3) {
+                    answerEl.value += value;
+                }
+            }
+        });
+
+        // --- ゲーム開始 ---
+        // ページが読み込まれたら、最初の問題を生成して表示
+        generateProblem();
+
+    </script>
+</body>
+</html>
